@@ -207,11 +207,17 @@ def find_main_windows() -> list[WindowInfo]:
 
 
 def _ensure_com() -> None:
-    """Initialize COM for the current thread (pywinauto/comtypes need it)."""
+    """Join the multi-threaded COM apartment from the current thread.
+
+    UI Automation objects are created once and then used from whatever thread
+    handles the next tool call or prompt-bar command; that only works when every
+    such thread is in the same multi-threaded apartment. A thread that was
+    already initialized differently (e.g. Tk's main thread) is left alone.
+    """
     try:
         import comtypes
 
-        comtypes.CoInitializeEx(comtypes.COINIT_APARTMENTTHREADED)
+        comtypes.CoInitializeEx(comtypes.COINIT_MULTITHREADED)
     except Exception:
         pass
 
@@ -325,6 +331,7 @@ class LibreCAD:
             return False
 
     def ensure(self) -> None:
+        _ensure_com()
         if not self._connected():
             self.connect()
 
@@ -463,10 +470,11 @@ class LibreCAD:
 
     @staticmethod
     def _strip_echo(output: str, sent: str) -> str:
-        lines = output.split("\n")
-        sent_simplified = " ".join(sent.split())
-        cleaned = [ln for ln in lines if " ".join(ln.split()) != sent_simplified]
-        return "\n".join(ln for ln in cleaned if ln.strip())
+        """Drop LibreCAD's echo of what we typed (the whole line and each ';' part)."""
+        echoes = {" ".join(p.split()) for p in sent.split(";") if p.strip()}
+        echoes.add(" ".join(sent.split()))
+        cleaned = [ln for ln in output.split("\n") if ln.strip() and " ".join(ln.split()) not in echoes]
+        return "\n".join(cleaned)
 
     def run(self, commands: Iterable[str], finish: bool = False, batch: int = 40,
             wait: float = 4.0) -> CommandResult:
@@ -533,6 +541,7 @@ class LibreCAD:
         return out
 
     def dialog_wrapper(self, hwnd: int):
+        _ensure_com()
         return self._desktop_obj().window(handle=hwnd).wrapper_object()
 
     def wait_dialog(self, predicate: Optional[Callable[[WindowInfo, object], bool]] = None,

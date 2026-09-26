@@ -14,6 +14,7 @@ import queue
 import threading
 import time
 import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
 from tkinter import ttk
 from typing import Optional
 
@@ -52,6 +53,8 @@ class PromptBar:
         self.fixed_width = width
         self.engine = ClaudeCodeEngine(model=model)
         self.lc = LibreCAD()
+        # One long-lived thread owns all direct LibreCAD (UI Automation) work.
+        self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="librecad")
         self.events: "queue.Queue[AgentEvent]" = queue.Queue()
         self.busy = False
         self.history: list[str] = []
@@ -229,6 +232,7 @@ class PromptBar:
                 self._launch_librecad()
             return
         self.entry.delete(0, "end")
+        self.entry.focus_set()
         self.history.append(text)
         self.hist_index = len(self.history)
         self.status_lbl.pack_forget()
@@ -242,15 +246,23 @@ class PromptBar:
     def _run_raw(self, raw: str) -> None:
         def work():
             try:
-                cmds = [c for c in raw.split(";") if c.strip()]
+                cmds = [c.strip() for c in raw.split(";") if c.strip()]
                 r = self.lc.run(cmds)
-                self.events.put(AgentEvent("result", r.summary()))
+                # Keep LibreCAD's messages (errors, prompts) but not its "Command: x (y)" confirmations.
+                messages = [ln for ln in r.output.splitlines()
+                            if ln.strip() and not ln.startswith("Command:")]
+                head = ("✕ " if r.error else "✓ ") + ";".join(cmds)
+                if r.error:
+                    messages.append(r.error)
+                if r.prompt and r.prompt != "Command:":
+                    messages.append(f"LibreCAD is waiting: {r.prompt}")
+                self.events.put(AgentEvent("result", "\n".join([head, *messages])))
             except LibreCADNotRunning as exc:
                 self.events.put(AgentEvent("error", str(exc)))
             except Exception as exc:  # noqa: BLE001
                 self.events.put(AgentEvent("error", f"{type(exc).__name__}: {exc}"))
         self._set_busy(True)
-        threading.Thread(target=work, daemon=True).start()
+        self.worker.submit(work)
 
     def _launch_librecad(self) -> None:
         def work():
@@ -260,7 +272,7 @@ class PromptBar:
                 self.events.put(AgentEvent("result", "LibreCAD started."))
             except Exception as exc:  # noqa: BLE001
                 self.events.put(AgentEvent("error", str(exc)))
-        threading.Thread(target=work, daemon=True).start()
+        self.worker.submit(work)
 
     def _agent_thread(self, text: str) -> None:
         try:
@@ -352,6 +364,7 @@ class PromptBar:
             self._status(first if len(first) < 160 else first[:157] + "…")
             self._log(ev.text.strip() + "\n", "")
             self.dot.configure(fg=DIM)
+            self.entry.focus_set()
         elif ev.kind == "error":
             self._set_busy(False)
             self._status(ev.text.splitlines()[0][:200], error=True)
