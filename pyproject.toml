@@ -26,6 +26,10 @@ dev = ["pytest>=8"]
 [project.scripts]
 librecad-mcp = "librecad_mcp.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/wymunw-cloud/librecadmcp"
+Repository = "https://github.com/wymunw-cloud/librecadmcp"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

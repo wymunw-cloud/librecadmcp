@@ -51,8 +51,8 @@ saving it and parsing the DXF with [ezdxf](https://ezdxf.mozman.at/).
 ## Install
 
 ```bash
-git clone https://github.com/<you>/librecad-mcp
-cd librecad-mcp
+git clone https://github.com/wymunw-cloud/librecadmcp
+cd librecadmcp
 uv sync
 ```
 
