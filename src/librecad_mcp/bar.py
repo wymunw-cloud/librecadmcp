@@ -249,14 +249,21 @@ class PromptBar:
                 cmds = [c.strip() for c in raw.split(";") if c.strip()]
                 r = self.lc.run(cmds)
                 # Keep LibreCAD's messages (errors, prompts) but not its "Command: x (y)" confirmations.
-                messages = [ln for ln in r.output.splitlines()
+                messages = [ln.strip() for ln in r.output.splitlines()
                             if ln.strip() and not ln.startswith("Command:")]
-                head = ("✕ " if r.error else "✓ ") + ";".join(cmds)
                 if r.error:
                     messages.append(r.error)
                 if r.prompt and r.prompt != "Command:":
                     messages.append(f"LibreCAD is waiting: {r.prompt}")
-                self.events.put(AgentEvent("result", "\n".join([head, *messages])))
+                sent = ";".join(cmds)
+                failed = bool(r.error) or any(
+                    key in m for m in messages
+                    for key in ("Unknown command", "Not a valid", "Syntax Error", "No entity", "Nothing to"))
+                if messages:
+                    lines = [("✕ " if failed else "ℹ ") + " · ".join(messages), f"sent: {sent}"]
+                else:
+                    lines = [f"✓ {sent}"]
+                self.events.put(AgentEvent("result", "\n".join(lines)))
             except LibreCADNotRunning as exc:
                 self.events.put(AgentEvent("error", str(exc)))
             except Exception as exc:  # noqa: BLE001
