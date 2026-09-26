@@ -166,8 +166,8 @@ class PromptBar:
     def _place(self, hwnd: int) -> None:
         left, top, right, bottom = _window_rect(hwnd)
         _, _, _, work_bottom = _work_area()
-        height = self.HEIGHT + (self.LOG_HEIGHT if self.log_visible else 0) + \
-            (22 if self.status_lbl.winfo_ismapped() else 0)
+        self.root.update_idletasks()
+        height = max(self.HEIGHT, self.frame.winfo_reqheight()) + (self.LOG_HEIGHT if self.log_visible else 0)
         if self._manual_pos:
             x, y = self._manual_pos
             width = self.fixed_width or max(600, right - left - 16)
