@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+
+# Local state written by the prompt bar (session ids, logs)
+.librecad-mcp/
+
+# LibreCAD source archive kept locally for reference, not part of this project
+LibreCAD-master.zip
+*.zip
