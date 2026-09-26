@@ -67,10 +67,6 @@ class PromptBar:
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
         self.root.configure(bg=BG)
-        try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except Exception:
-            pass
         self._build()
         self.root.after(200, self._follow_librecad)
         self.root.after(100, self._drain_events)
@@ -374,7 +370,20 @@ class PromptBar:
         self.root.destroy()
 
 
+def _enable_dpi_awareness() -> None:
+    """Use physical pixels everywhere so the bar lines up with the LibreCAD window
+    on scaled displays. Must run before Tk creates its first window."""
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor
+    except Exception:
+        try:
+            user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
 def main(model: Optional[str] = None, position: str = "overlay", width: Optional[int] = None) -> None:
+    _enable_dpi_awareness()
     PromptBar(model=model, position=position, width=width).run()
 
 
